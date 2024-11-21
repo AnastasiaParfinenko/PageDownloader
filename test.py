@@ -23,6 +23,23 @@ class FakeFS:
 
 class TestCalculator(unittest.TestCase):
 
+    def test_recursive_references(self):
+        internet = FakeInternet({
+            "http://example.org/": '<a href="foo">this is a link</a>',
+            "http://example.org/foo/": '<a href="/">this is a link</a>'
+        })
+        fs = FakeFS()
+
+        app = App(internet, fs, 1e9, set())
+        cur_depth = 0
+
+        app.download(cur_depth, "http://example.org")
+
+        self.assertEqual(fs.catalog, {
+            "example.org/index.html": '<a href="foo/index.html">this is a link</a>',
+            "example.org/foo/index.html": '<a href="../index.html">this is a link</a>'
+        })
+
     def test_already_visited_url(self):
         internet = FakeInternet({
             "http://example.org/": '<a href="foo">this is a link</a>',
@@ -33,7 +50,7 @@ class TestCalculator(unittest.TestCase):
         app = App(internet, fs, 1, set())
         cur_depth = 0
 
-        download(app, cur_depth, "http://example.org")
+        app.download(cur_depth, "http://example.org")
 
         self.assertEqual(fs.catalog, {
             "example.org/index.html": '<a href="foo/index.html">this is a link</a>',
@@ -52,7 +69,7 @@ class TestCalculator(unittest.TestCase):
         app = App(internet, fs, 0, set())
         cur_depth = 0
 
-        download(app, cur_depth, "http://example.org")
+        app.download(cur_depth, "http://example.org")
 
         self.assertEqual(fs.catalog, {
             "example.org/index.html": '<a href="http://example.org/foo">this is a link</a>'
@@ -70,7 +87,7 @@ class TestCalculator(unittest.TestCase):
         app = App(internet, fs, 1, set())
         cur_depth = 0
 
-        download(app, cur_depth, "http://example.org")
+        app.download(cur_depth, "http://example.org")
 
         self.assertEqual(fs.catalog, {
             "example.org/index.html": '<a href="foo/index.html">this is a link</a>',
@@ -89,7 +106,7 @@ class TestCalculator(unittest.TestCase):
         app = App(internet, fs, 2, set())
         cur_depth = 0
 
-        download(app, cur_depth, "http://example.org")
+        app.download(cur_depth, "http://example.org")
 
         self.assertEqual(fs.catalog, {
             "example.org/index.html": '<a href="foo/index.html">this is a link</a>',
@@ -109,7 +126,7 @@ class TestCalculator(unittest.TestCase):
         app = App(internet, fs, 3, set())
         cur_depth = 0
 
-        download(app, cur_depth, "http://example.org")
+        app.download(cur_depth, "http://example.org")
 
         self.assertEqual(fs.catalog, {
             "example.org/index.html": '<a href="foo/index.html">this is a link</a>',
@@ -128,7 +145,7 @@ class TestCalculator(unittest.TestCase):
         app = App(internet, fs, 2, set())
         cur_depth = 0
 
-        download(app, cur_depth, "http://example.org/index.html")
+        app.download(cur_depth, "http://example.org/index.html")
 
         self.assertEqual(fs.catalog, {
                 "example.org/index.html": '<a href="qux.html">this is a link</a>',
@@ -147,7 +164,7 @@ class TestCalculator(unittest.TestCase):
 
         cur_depth = 0
 
-        download(app, cur_depth, "http://example.org")
+        app.download(cur_depth, "http://example.org")
 
         self.assertEqual(fs.catalog, {
             "example.org/index.html":
@@ -166,7 +183,7 @@ class TestCalculator(unittest.TestCase):
         app = App(internet, fs, 2, set())
         cur_depth = 0
 
-        download(app, cur_depth, "http://example.org/foo/bar/index.html")
+        app.download(cur_depth, "http://example.org/foo/bar/index.html")
 
         self.assertEqual(fs.catalog, {
                 "example.org/foo/bar/index.html": '<a href="../../qux.html">this is a link</a>',

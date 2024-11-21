@@ -69,8 +69,49 @@ class App:
     def __init__(self, internet, fs, depth, visited_address):
         self.internet = internet
         self.fs = fs
-        self.depth = depth
+        self.max_depth = depth
         self.visited_address = visited_address
+
+    def download(self, cur_depth, address):
+        url = Url(address)
+        if not self.try_download(cur_depth, url):
+            print('Invalid URL')
+
+    def try_download(self, cur_depth, url):
+        if url.address in self.visited_address:
+            return True
+        if cur_depth > self.max_depth:
+            return False
+
+        response = self.internet.get(url)
+        if response:
+            self.visited_address.add(response.url.address)
+            text = self.process_links(cur_depth + 1, response)
+            self.fs.save(response.url.path, text)
+            return True
+
+        return False
+
+    def process_links(self, cur_depth, response):
+        url = response.url
+        patched_text = response.text
+        links = get_links(response)
+        for link in links:
+            if not is_absolute(link):
+                new_address = urljoin(url.address, link)
+            elif Url(link).domain == url.domain:
+                new_address = link
+            else:
+                continue
+
+            new_url = Url(new_address)
+            downloaded = self.try_download(cur_depth, new_url)
+
+            new_link = internal_link(new_url, url) if downloaded else new_address
+
+            patched_text = patched_text.replace(f'href="{link}"', f'href="{new_link}"', 1)
+
+        return patched_text
 
 
 def try_exit(text):
@@ -91,51 +132,12 @@ def get_links(response):
     return links_list
 
 
-def inside_links(app, cur_depth, response):
-    url = response.url
-    patched_text = response.text
-    links = get_links(response)
-    for link in links:
-        if not is_absolute(link):
-            new_address = urljoin(url.address, link)
-        elif Url(link).domain == url.domain:
-            new_address = link
-        else:
-            continue
-
-        new_url = Url(new_address)
-        # TODO: redirection?
-
-        if cur_depth <= app.depth or new_url.address in app.visited_address:
-            new_link = internal_link(new_url, url)
-            download(app, cur_depth, new_address)
-        else:
-            new_link = new_address
-
-        patched_text = patched_text.replace(f'href="{link}"', f'href="{new_link}"', 1)
-
-    return patched_text
-
-
 def internal_link(ref_url, cur_url):
     ref_path = Path(ref_url.path)
     cur_path = Path(cur_url.path)
     new_link = os.path.relpath(ref_path, cur_path.parent)
 
     return new_link
-
-
-def download(app, cur_depth, address):
-    url = Url(address)
-    response = app.internet.get(url)
-
-    if cur_depth <= app.depth and response:
-        app.visited_address.add(response.url.address)
-        cur_depth += 1
-        text = inside_links(app, cur_depth, response)
-        app.fs.save(response.url.path, text)
-    elif cur_depth == 0:
-        print('Invalid URL')
 
 
 def main():
@@ -148,8 +150,7 @@ def main():
         if not is_absolute(address):
             address = 'http://' + address
 
-        cur_depth = 0
-        download(app, cur_depth, address)
+        app.download(0, address)
 
 
 if __name__ == '__main__':
